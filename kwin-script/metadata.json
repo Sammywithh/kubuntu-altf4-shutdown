@@ -1,0 +1,18 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Name": "Kubuntu Alt+F4 Shutdown",
+        "Description": "Closes active window or shows Kubuntu shutdown menu when on desktop",
+        "Icon": "system-shutdown",
+        "Authors": [
+            {
+                "Name": "Kubuntu User"
+            }
+        ],
+        "Id": "kubuntu-altf4-shutdown",
+        "Version": "1.0.0",
+        "License": "GPL-3.0+",
+        "Category": "Windows"
+    },
+    "X-Plasma-API": "javascript"
+}

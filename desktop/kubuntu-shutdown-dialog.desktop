@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Sitzung beenden (Alt+F4)
+Name[de]=Sitzung beenden (Alt+F4)
+Comment=Kubuntu 26.04 Herunterfahren- und Abmeldedialog
+Comment[de]=Kubuntu 26.04 Herunterfahren- und Abmeldedialog
+Exec=/home/sekonya/.local/bin/kubuntu-shutdown-dialog
+Icon=system-shutdown
+Terminal=false
+Type=Application
+Categories=Qt;KDE;System;
+StartupNotify=true
