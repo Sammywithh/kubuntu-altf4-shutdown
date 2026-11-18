@@ -1,0 +1,22 @@
+[package]
+name = "kubuntu-shutdown-dialog"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Kubuntu 26.04 Style Alt+F4 Smart Shutdown Dialog in KDE Breeze design"
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "kubuntu-shutdown-dialog"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+resvg = { version = "0.50.0", default-features = false }
+zbus = { version = "6.3.0", default-features = false, features = ["default-rt", "service", "proxy"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 1
