@@ -20,7 +20,7 @@ if command -v kwriteconfig6 &> /dev/null; then
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "AltF4DesktopShutdown" "none,Alt+F4,Fenster schließen oder Herunterfahren-Menü anzeigen"
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "kubuntu-altf4-shutdown:AltF4DesktopShutdown" "none,none,"
     kwriteconfig6 --file kwinrc --group Plugins --key "kubuntu-altf4-shutdownEnabled" "false"
-    
+
     if command -v qdbus6 &> /dev/null; then
         qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
     fi
@@ -39,7 +39,7 @@ echo "[3/4] Entferne D-Bus Service und Desktop-Starter..."
 rm -f "${DBUS_SERVICE_DIR}/org.kubuntu.ShutdownDialog.service"
 rm -f "${DESKTOP_DIR}/kubuntu-shutdown-dialog.desktop"
 
-# 4. Remove Binary wrapper
+# 4. Remove Binary
 echo "[4/4] Entferne Programmdatei..."
 rm -f "${BIN_DIR}/kubuntu-shutdown-dialog"
 rm -rf "${HOME}/.local/share/kubuntu-shutdown-dialog"

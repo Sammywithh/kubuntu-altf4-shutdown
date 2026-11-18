@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
-# Test and launch the Kubuntu Shutdown Dialog directly
+# Build (if needed) and launch the Rust Kubuntu Shutdown Dialog directly
+set -e
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec /usr/bin/python3 "${DIR}/src/main.py" "$@"
+BIN="${DIR}/target/release/kubuntu-shutdown-dialog"
+
+if [ ! -x "${BIN}" ]; then
+    cargo build --release --manifest-path "${DIR}/Cargo.toml"
+fi
+
+exec "${BIN}" "$@"

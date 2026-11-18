@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Installation Script: Kubuntu 26.04 Alt+F4 Smart Shutdown Dialog
+# Installation Script: Kubuntu 26.04 Alt+F4 Smart Shutdown Dialog (Rust)
 # ==============================================================================
 
 set -e
@@ -17,23 +17,31 @@ echo ""
 # 1. Ensure required directories exist
 mkdir -p "${BIN_DIR}" "${KWIN_SCRIPT_DIR}/contents/code" "${DBUS_SERVICE_DIR}" "${DESKTOP_DIR}"
 
-# 2. Install Python Application Wrapper
-echo "[1/5] Installiere Anwendungsdateien in ${BIN_DIR}..."
-cat << 'EOF' > "${BIN_DIR}/kubuntu-shutdown-dialog"
-#!/usr/bin/env bash
-APP_DIR="$(dirname "$(readlink -f "$0")")"
-PROJECT_DIR="${HOME}/KI-Agentic-Projects/kubuntu-altf4-shutdown/src"
-if [ -d "${PROJECT_DIR}" ]; then
-    exec /usr/bin/python3 "${PROJECT_DIR}/main.py" "$@"
+# 2. Locate or compile the native Rust binary
+echo "[1/5] Installiere native Rust-Anwendung in ${BIN_DIR}..."
+SOURCE_BIN=""
+if [ -x "${SCRIPT_DIR}/target/release/kubuntu-shutdown-dialog" ]; then
+    SOURCE_BIN="${SCRIPT_DIR}/target/release/kubuntu-shutdown-dialog"
+elif [ -x "${SCRIPT_DIR}/kubuntu-shutdown-dialog" ]; then
+    SOURCE_BIN="${SCRIPT_DIR}/kubuntu-shutdown-dialog"
+elif [ -f "${SCRIPT_DIR}/Cargo.toml" ]; then
+    if ! command -v cargo &> /dev/null; then
+        echo "Fehler: 'cargo' wurde nicht gefunden und kein vorkompiliertes Binary liegt vor." >&2
+        echo "Bitte installiere Rust (https://rustup.rs) oder lade ein Linux-Release-Archiv herunter." >&2
+        exit 1
+    fi
+    echo "Kompiliere Release-Binary mit Cargo..."
+    cargo build --release --manifest-path "${SCRIPT_DIR}/Cargo.toml"
+    SOURCE_BIN="${SCRIPT_DIR}/target/release/kubuntu-shutdown-dialog"
 else
-    exec /usr/bin/python3 "${APP_DIR}/kubuntu-shutdown-dialog-src/main.py" "$@"
+    echo "Fehler: Weder kubuntu-shutdown-dialog Binary noch Cargo.toml gefunden." >&2
+    exit 1
 fi
-EOF
-chmod +x "${BIN_DIR}/kubuntu-shutdown-dialog"
 
-# Copy source files to backup dir in ~/.local/share
-mkdir -p "${HOME}/.local/share/kubuntu-shutdown-dialog"
-cp -r "${SCRIPT_DIR}/src"/* "${HOME}/.local/share/kubuntu-shutdown-dialog/"
+install -m 755 "${SOURCE_BIN}" "${BIN_DIR}/kubuntu-shutdown-dialog"
+
+# Remove legacy Python files if upgrading from an older version
+rm -rf "${HOME}/.local/share/kubuntu-shutdown-dialog"
 
 # 3. Install D-Bus Service File
 echo "[2/5] Registriere D-Bus Service..."
@@ -56,11 +64,11 @@ echo "[5/5] Konfiguriere KWin und Alt+F4 Tastenkombination..."
 if command -v kwriteconfig6 &> /dev/null; then
     # Enable KWin script plugin
     kwriteconfig6 --file kwinrc --group Plugins --key "kubuntu-altf4-shutdownEnabled" "true"
-    
+
     # Disable default Window Close shortcut conflict and route Alt+F4 to our script
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Window Close" "none,Alt+F4,Fenster schließen"
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "AltF4DesktopShutdown" "Alt+F4,Alt+F4,Fenster schließen oder Herunterfahren-Menü anzeigen"
-    
+
     # Reload KWin configuration
     if command -v qdbus6 &> /dev/null; then
         qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true

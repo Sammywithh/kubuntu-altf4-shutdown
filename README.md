@@ -1,6 +1,6 @@
 # Kubuntu 26.04 Alt+F4 Smart Shutdown Dialog
 
-Ein modernes, elegantes und natives **Herunterfahren- und Abmelde-Menü für Kubuntu (KDE Plasma 6)** im Stil von Kubuntu 26.04 / KDE Breeze, gesteuert über die beliebte Tastenkombination **`Alt + F4`**.
+Ein modernes, natives **Herunterfahren- und Abmelde-Menü für Kubuntu (KDE Plasma 6)** in **Rust** (`eframe`/`egui`, `resvg`, `zbus`) im Stil von Kubuntu 26.04 / KDE Breeze, gesteuert über **`Alt + F4`**.
 
 ---
 
@@ -11,60 +11,71 @@ Ein modernes, elegantes und natives **Herunterfahren- und Abmelde-Menü für Kub
   - Wenn der Desktop aktiv ist (oder alle Fenster minimiert/geschlossen sind): **`Alt + F4` öffnet das Kubuntu Herunterfahren-Menü**.
 - **Authentisches Kubuntu 26.04 / KDE Breeze Design**:
   - Große, übersichtliche Aktionskacheln mit originalen KDE Breeze System-Icons:
-    - ⏻ **Herunterfahren** (`H` / Enter)
-    - ⟳ **Neu starten** (`N`)
-    - ⏸ **Energie sparen / Standby** (`E`)
-    - ❄ **Ruhezustand** (`R`)
-    - ↪ **Abmelden** (`A`)
-    - 🔒 **Sperren** (`S`)
-    - 👤 **Benutzer wechseln** (`B`)
+    - **Herunterfahren** (`H` / Enter)
+    - **Neu starten** (`N`)
+    - **Energie sparen** (`E`)
+    - **Ruhezustand** (`R`)
+    - **Abmelden** (`A`)
+    - **Sperren** (`S`)
+    - **Benutzer wechseln** (`B`)
   - **Dynamischer Informationstext**: Zeigt bei Hover oder Tastaturfokus eine genaue Beschreibung der gewählten Aktion an.
-  - **Volle Tastatursteuerung**: Navigation mit Pfeiltasten, Schnelltasten (H, N, E, R, A, S, B), `Enter` zum Bestätigen und `Esc` zum Abbrechen.
-  - **Automatisches Dark / Light Theme**: Passt sich automatisch dem aktuellen Farbschema von Kubuntu an.
-- **Ressourcenschonend (Zero CPU im Hintergrund)**:
-  - Läuft nicht permanent im Hintergrund, sondern wird über KWin / D-Bus bei Bedarf blitzschnell aufgerufen.
+  - **Volle Tastatursteuerung**: Navigation mit Pfeiltasten und `Tab`/`Shift+Tab`, Schnelltasten (`H`, `N`, `E`, `R`, `A`, `S`, `B`), `Enter`/`Leertaste` zum Bestätigen und `Esc` zum Abbrechen.
+  - **Automatisches Dark / Light Theme**: Liest `~/.config/kdeglobals` und passt Farben sowie SVG-Icons automatisch an KDE Breeze Dark / Light an.
+- **Natives Rust-Binary (Zero Python Runtime, Zero CPU im Hintergrund)**:
+  - Wird als schnelles natives Binary per D-Bus On-Demand aktiviert (`org.kubuntu.ShutdownDialog` auf `/Dialog`) und benötigt keine Python- oder PyQt-Abhängigkeiten zur Laufzeit.
 
 ---
 
-## 🚀 Installation & Aktivierung
+## 🛠️ Kompilieren & Installation
 
-### 1. Installation starten
-Führe im Projektverzeichnis einfach das Installationsskript aus:
+### Voraussetzungen zum Selbstkompilieren
+- Rust Toolchain (`cargo` / `rustc` ≥ 1.95)
 
+### Bauen & Installieren
 ```bash
-cd /home/sekonya/KI-Agentic-Projects/kubuntu-altf4-shutdown
+git clone https://github.com/Sammywithh/kubuntu-altf4-shutdown.git
+cd kubuntu-altf4-shutdown
+cargo build --release --locked
 ./install.sh
 ```
 
-Das Skript:
-1. Richtet die Anwendung in `~/.local/bin/kubuntu-shutdown-dialog` ein.
-2. Registriert den D-Bus Dienst für On-Demand Aktivierung.
-3. Installiert das KWin 6 Skript für intelligentes Alt+F4.
+> **Hinweis**: Wenn du ein vorkompiliertes Linux-Release-Archiv aus den GitHub Releases / Actions-Artefakten entpackst, erkennt `./install.sh` das beiliegende `kubuntu-shutdown-dialog`-Binary automatisch und installiert es ohne Cargo.
+
+Das Installationsskript:
+1. Installiert das native Rust-Binary nach `~/.local/bin/kubuntu-shutdown-dialog`.
+2. Registriert den D-Bus Dienst für On-Demand-Aktivierung.
+3. Installiert das KWin 6 Skript für intelligentes `Alt+F4`.
 4. Schaltet die Tastenkombination `Alt+F4` live scharf.
 
 ---
 
-## 🧪 Schneller Test
+## 🧪 Testen & Optionen
 
-Du kannst das Menü jederzeit direkt im Terminal testen:
-
+Direktes Starten des Menüs (kompiliert bei Bedarf automatisch im Release-Modus):
 ```bash
 ./test_dialog.sh
 ```
 
-Oder das offizielle KDE Plasma 6 Vollbild-Abmeldemenü testen:
+Verfügbare CLI-Flags von `kubuntu-shutdown-dialog`:
+- `--native`: Öffnet direkt das offizielle KDE Plasma 6 Abmeldemenü.
+- `--daemon`: Startet den schlanken D-Bus-Hintergrunddienst ohne offenes Fenster.
+- `--no-dbus`: Öffnet den Dialog direkt ohne D-Bus-Registrierung.
+- `--help` / `--version`: Zeigt Hilfe bzw. Version an.
 
-```bash
-./test_dialog.sh --native
-```
+---
+
+## ⚙️ Automatisierter Linux-Build (GitHub Actions)
+
+Über [`.github/workflows/build.yml`](.github/workflows/build.yml) wird bei jedem Push und Pull Request auf `main`/`master` sowie bei Tags `v*`:
+- `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings` und `cargo test` ausgeführt,
+- das optimierte Linux-Release-Binary (`kubuntu-shutdown-dialog`) gebaut,
+- ein vollständiges Installationsarchiv (`kubuntu-altf4-shutdown-linux-x86_64.tar.gz`) samt SHA256-Prüfsumme als Artefakt hochgeladen (und bei `v*`-Tags an ein GitHub Release angehängt).
 
 ---
 
 ## 🗑️ Deinstallation
 
-Falls du jederzeit zum Standard-Verhalten von KDE Plasma zurückkehren möchtest:
-
 ```bash
 ./uninstall.sh
 ```
-Dadurch wird die originale `Alt+F4` Verknüpfung von KWin wiederhergestellt und alle Dateien sauber entfernt.
+Dadurch wird die originale `Alt+F4` Verknüpfung von KWin wiederhergestellt und alle installierten Dateien werden sauber entfernt.
