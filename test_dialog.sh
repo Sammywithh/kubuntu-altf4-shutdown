@@ -3,10 +3,14 @@
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN="${DIR}/target/release/kubuntu-shutdown-dialog"
 
-if [ ! -x "${BIN}" ]; then
+if [ -x "${DIR}/target/release/kubuntu-shutdown-dialog" ]; then
+    BIN="${DIR}/target/release/kubuntu-shutdown-dialog"
+elif [ -x "${DIR}/kubuntu-shutdown-dialog" ]; then
+    BIN="${DIR}/kubuntu-shutdown-dialog"
+else
     cargo build --release --manifest-path "${DIR}/Cargo.toml"
+    BIN="${DIR}/target/release/kubuntu-shutdown-dialog"
 fi
 
 exec "${BIN}" "$@"

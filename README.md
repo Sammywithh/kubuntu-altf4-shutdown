@@ -67,8 +67,9 @@ Verfügbare CLI-Flags von `kubuntu-shutdown-dialog`:
 ## ⚙️ Automatisierter Linux-Build (GitHub Actions)
 
 Über [`.github/workflows/build.yml`](.github/workflows/build.yml) wird bei jedem Push und Pull Request auf `main`/`master` sowie bei Tags `v*`:
-- `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings` und `cargo test` ausgeführt,
+- `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings` und `cargo test` ausgeführt,
 - das optimierte Linux-Release-Binary (`kubuntu-shutdown-dialog`) gebaut,
+- bei Pushes/Workflow-Läufen auf `main`/`master` das kompilierte Binary (`./kubuntu-shutdown-dialog`) automatisch mit `[skip ci]` zurück in den Branch committet und gepusht,
 - ein vollständiges Installationsarchiv (`kubuntu-altf4-shutdown-linux-x86_64.tar.gz`) samt SHA256-Prüfsumme als Artefakt hochgeladen (und bei `v*`-Tags an ein GitHub Release angehängt).
 
 ---
