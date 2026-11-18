@@ -92,12 +92,19 @@ pub struct IconSet {
 impl IconSet {
     /// Rasterizes and uploads all dialog icons for the given theme palette.
     pub fn load(ctx: &egui::Context, palette: &ThemePalette) -> Self {
-        let kde_logo = load_texture(ctx, "kde-logo", "kde", palette, 80);
-        let cancel = load_texture(ctx, "dialog-cancel", "dialog-cancel", palette, 32);
+        let kde_logo = load_texture(ctx, "kde-logo", "kde", None, palette, 80);
+        let cancel = load_texture(ctx, "dialog-cancel", "dialog-cancel", None, palette, 32);
 
         let mut actions = HashMap::with_capacity(ACTIONS.len());
         for action in ACTIONS {
-            let handle = load_texture(ctx, action.icon, action.icon, palette, 72);
+            let handle = load_texture(
+                ctx,
+                action.icon,
+                action.icon,
+                Some(action.fallback_icon),
+                palette,
+                72,
+            );
             actions.insert(action.icon, handle);
         }
 
@@ -207,10 +214,14 @@ fn load_texture(
     ctx: &egui::Context,
     texture_id: &str,
     icon_name: &str,
+    fallback_icon: Option<&str>,
     palette: &ThemePalette,
     size_px: u32,
 ) -> TextureHandle {
-    let color_image = match rasterize_svg_icon(icon_name, palette, size_px) {
+    let pixmap = rasterize_svg_icon(icon_name, palette, size_px)
+        .or_else(|| fallback_icon.and_then(|fb| rasterize_svg_icon(fb, palette, size_px)));
+
+    let color_image = match pixmap {
         Some(pixmap) => {
             ColorImage::from_rgba_premultiplied([size_px as usize, size_px as usize], pixmap.data())
         }

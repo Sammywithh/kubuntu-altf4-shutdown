@@ -23,12 +23,14 @@ pub enum ActionId {
 #[derive(Debug, Clone, Copy)]
 pub struct ActionInfo {
     pub id: ActionId,
+    #[cfg_attr(not(test), expect(dead_code))]
     pub key: &'static str,
     pub title: &'static str,
     pub description: &'static str,
     pub icon: &'static str,
     pub fallback_icon: &'static str,
     pub hotkey: char,
+    #[cfg_attr(not(test), expect(dead_code))]
     pub destructive: bool,
     pub row: usize,
     pub col: usize,

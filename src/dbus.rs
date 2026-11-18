@@ -17,7 +17,6 @@ use crate::actions::action_kde_native_prompt;
 pub const SERVICE_NAME: &str = "org.kubuntu.ShutdownDialog";
 pub const OBJECT_PATH: &str = "/Dialog";
 pub const IFACE_PRIMARY: &str = "org.kubuntu.ShutdownDialog";
-pub const IFACE_LOCAL: &str = "local.DBusService";
 
 /// Trait implemented by D-Bus execution modes (GUI focus wake-up or background daemon spawner).
 pub trait DialogController: Send + Sync {
@@ -101,6 +100,12 @@ impl DialogController for GuiDialogController {
 /// Controller used in `--daemon` mode to spawn the dialog on demand without keeping a window open.
 pub struct DaemonController {
     active_child: Mutex<Option<Child>>,
+}
+
+impl Default for DaemonController {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DaemonController {
