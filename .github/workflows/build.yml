@@ -1,0 +1,80 @@
+name: Build Linux Binary
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run unit tests
+        run: cargo test --verbose
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Package Linux distribution archive
+        run: |
+          mkdir -p dist/kubuntu-altf4-shutdown artifacts
+          cp target/release/kubuntu-shutdown-dialog dist/kubuntu-altf4-shutdown/
+          cp install.sh uninstall.sh test_dialog.sh README.md dist/kubuntu-altf4-shutdown/
+          cp -r dbus desktop kwin-script dist/kubuntu-altf4-shutdown/
+          chmod +x dist/kubuntu-altf4-shutdown/kubuntu-shutdown-dialog \
+            dist/kubuntu-altf4-shutdown/install.sh \
+            dist/kubuntu-altf4-shutdown/uninstall.sh \
+            dist/kubuntu-altf4-shutdown/test_dialog.sh
+
+          tar -C dist -czf artifacts/kubuntu-altf4-shutdown-linux-x86_64.tar.gz kubuntu-altf4-shutdown
+          cp target/release/kubuntu-shutdown-dialog artifacts/kubuntu-shutdown-dialog-linux-x86_64
+          (
+            cd artifacts
+            sha256sum kubuntu-altf4-shutdown-linux-x86_64.tar.gz kubuntu-shutdown-dialog-linux-x86_64 > SHA256SUMS.txt
+          )
+
+      - name: Upload Linux build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubuntu-shutdown-dialog-linux-x86_64
+          path: artifacts/
+          if-no-files-found: error
+
+      - name: Publish GitHub Release on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/kubuntu-altf4-shutdown-linux-x86_64.tar.gz
+            artifacts/kubuntu-shutdown-dialog-linux-x86_64
+            artifacts/SHA256SUMS.txt

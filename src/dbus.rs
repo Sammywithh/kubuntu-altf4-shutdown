@@ -157,7 +157,9 @@ impl DialogController for DaemonController {
     }
 }
 
-async fn build_service_connection(controller: Arc<dyn DialogController>) -> zbus::Result<Connection> {
+async fn build_service_connection(
+    controller: Arc<dyn DialogController>,
+) -> zbus::Result<Connection> {
     let primary = PrimaryInterface {
         controller: Arc::clone(&controller),
     };

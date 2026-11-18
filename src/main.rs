@@ -164,17 +164,17 @@ where
 
 fn print_help() {
     println!(
-        "Kubuntu Alt+F4 Shutdown Menu ({})\n\
-         \n\
-         VERWENDUNG:\n\
-           kubuntu-shutdown-dialog [OPTIONEN]\n\
-         \n\
-         OPTIONEN:\n\
-               --native    Offizielles KDE Plasma 6 Abmeldemenü direkt öffnen\n\
-               --daemon    Als D-Bus-Dienst im Hintergrund starten\n\
-               --no-dbus   Dialog ohne D-Bus-Registrierung öffnen\n\
-           -h, --help      Diese Hilfe anzeigen\n\
-           -V, --version   Versionsnummer anzeigen",
+        concat!(
+            "Kubuntu Alt+F4 Shutdown Menu ({})\n\n",
+            "VERWENDUNG:\n",
+            "  kubuntu-shutdown-dialog [OPTIONEN]\n\n",
+            "OPTIONEN:\n",
+            "      --native    Offizielles KDE Plasma 6 Abmeldemenü direkt öffnen\n",
+            "      --daemon    Als D-Bus-Dienst im Hintergrund starten\n",
+            "      --no-dbus   Dialog ohne D-Bus-Registrierung öffnen\n",
+            "  -h, --help      Diese Hilfe anzeigen\n",
+            "  -V, --version   Versionsnummer anzeigen"
+        ),
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -362,10 +362,7 @@ impl KubuntuShutdownApp {
         );
         let painter = ui.painter();
 
-        let icon_pos = Pos2::new(
-            header_rect.left(),
-            header_rect.center().y - 20.0,
-        );
+        let icon_pos = Pos2::new(header_rect.left(), header_rect.center().y - 20.0);
         let icon_rect = Rect::from_min_size(icon_pos, Vec2::splat(40.0));
         painter.image(
             self.icons.kde_logo.id(),
@@ -777,18 +774,9 @@ mod tests {
             parse_cli_args(["prog", "--native"]).unwrap(),
             CliCommand::NativePrompt
         );
-        assert_eq!(
-            parse_cli_args(["prog", "--daemon"]).unwrap(),
-            CliCommand::Daemon
-        );
-        assert_eq!(
-            parse_cli_args(["prog", "--help"]).unwrap(),
-            CliCommand::Help
-        );
-        assert_eq!(
-            parse_cli_args(["prog", "--version"]).unwrap(),
-            CliCommand::Version
-        );
+        assert_eq!(parse_cli_args(["prog", "--daemon"]).unwrap(), CliCommand::Daemon);
+        assert_eq!(parse_cli_args(["prog", "--help"]).unwrap(), CliCommand::Help);
+        assert_eq!(parse_cli_args(["prog", "--version"]).unwrap(), CliCommand::Version);
         assert!(parse_cli_args(["prog", "--unknown"]).is_err());
     }
 

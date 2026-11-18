@@ -221,11 +221,10 @@ fn load_texture(
     let pixmap = rasterize_svg_icon(icon_name, palette, size_px)
         .or_else(|| fallback_icon.and_then(|fb| rasterize_svg_icon(fb, palette, size_px)));
 
+    let dim = [size_px as usize, size_px as usize];
     let color_image = match pixmap {
-        Some(pixmap) => {
-            ColorImage::from_rgba_premultiplied([size_px as usize, size_px as usize], pixmap.data())
-        }
-        None => ColorImage::filled([size_px as usize, size_px as usize], egui::Color32::TRANSPARENT),
+        Some(pixmap) => ColorImage::from_rgba_premultiplied(dim, pixmap.data()),
+        None => ColorImage::filled(dim, egui::Color32::TRANSPARENT),
     };
 
     ctx.load_texture(texture_id, color_image, TextureOptions::LINEAR)
@@ -262,10 +261,7 @@ mod tests {
                 resvg::render(&tree, Transform::from_scale(scale, scale), &mut pixmap.as_mut());
 
                 let non_transparent = pixmap.pixels().iter().filter(|p| p.alpha() > 0).count();
-                assert!(
-                    non_transparent > 10,
-                    "icon {icon} (dark={dark}) rendered blank"
-                );
+                assert!(non_transparent > 10, "icon {icon} (dark={dark}) rendered blank");
 
                 if icon != "kde" {
                     let expected_rgb = if dark { (252, 252, 252) } else { (35, 38, 41) };

@@ -201,9 +201,6 @@ BackgroundNormal=239,240,241
     #[test]
     fn returns_none_for_empty_or_unrecognized_ini() {
         assert_eq!(detect_dark_mode_from_ini(""), None);
-        assert_eq!(
-            detect_dark_mode_from_ini("[General]\nColorScheme=Custom\n"),
-            None
-        );
+        assert_eq!(detect_dark_mode_from_ini("[General]\nColorScheme=Custom\n"), None);
     }
 }
