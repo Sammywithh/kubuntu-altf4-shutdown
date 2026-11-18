@@ -258,10 +258,17 @@ mod tests {
                 let mut pixmap = Pixmap::new(64, 64).expect("pixmap allocation failed");
                 let svg_size = tree.size();
                 let scale = (64.0 / svg_size.width()).min(64.0 / svg_size.height());
-                resvg::render(&tree, Transform::from_scale(scale, scale), &mut pixmap.as_mut());
+                resvg::render(
+                    &tree,
+                    Transform::from_scale(scale, scale),
+                    &mut pixmap.as_mut(),
+                );
 
                 let non_transparent = pixmap.pixels().iter().filter(|p| p.alpha() > 0).count();
-                assert!(non_transparent > 10, "icon {icon} (dark={dark}) rendered blank");
+                assert!(
+                    non_transparent > 10,
+                    "icon {icon} (dark={dark}) rendered blank"
+                );
 
                 if icon != "kde" {
                     let expected_rgb = if dark { (252, 252, 252) } else { (35, 38, 41) };

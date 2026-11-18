@@ -194,9 +194,10 @@ fn configure_fonts(ctx: &egui::Context) {
     ];
 
     if let Some(bytes) = regular_candidates.iter().find_map(|p| fs::read(p).ok()) {
-        fonts
-            .font_data
-            .insert("system_regular".to_owned(), Arc::new(FontData::from_owned(bytes)));
+        fonts.font_data.insert(
+            "system_regular".to_owned(),
+            Arc::new(FontData::from_owned(bytes)),
+        );
         if let Some(family) = fonts.families.get_mut(&FontFamily::Proportional) {
             family.insert(0, "system_regular".to_owned());
         }
@@ -204,9 +205,10 @@ fn configure_fonts(ctx: &egui::Context) {
 
     let mut bold_chain = Vec::new();
     if let Some(bytes) = bold_candidates.iter().find_map(|p| fs::read(p).ok()) {
-        fonts
-            .font_data
-            .insert("system_bold".to_owned(), Arc::new(FontData::from_owned(bytes)));
+        fonts.font_data.insert(
+            "system_bold".to_owned(),
+            Arc::new(FontData::from_owned(bytes)),
+        );
         bold_chain.push("system_bold".to_owned());
     }
     if let Some(proportional) = fonts.families.get(&FontFamily::Proportional) {
@@ -394,10 +396,8 @@ impl KubuntuShutdownApp {
         idx: usize,
         action: &ActionInfo,
     ) -> Option<ActionId> {
-        let (rect, response) = ui.allocate_exact_size(
-            Vec2::new(TILE_WIDTH, TILE_HEIGHT),
-            Sense::click(),
-        );
+        let (rect, response) =
+            ui.allocate_exact_size(Vec2::new(TILE_WIDTH, TILE_HEIGHT), Sense::click());
         let hovered = response.hovered();
         let pressed = response.is_pointer_button_down_on();
         let focused = self.focused_target == FocusTarget::Action(idx);
@@ -466,10 +466,8 @@ impl KubuntuShutdownApp {
 
     fn draw_description_box(&self, ui: &mut egui::Ui) {
         let width = ui.available_width();
-        let (rect, _) = ui.allocate_exact_size(
-            Vec2::new(width, DESCRIPTION_HEIGHT),
-            Sense::hover(),
-        );
+        let (rect, _) =
+            ui.allocate_exact_size(Vec2::new(width, DESCRIPTION_HEIGHT), Sense::hover());
         let painter = ui.painter();
         let radius = CornerRadius::same(8);
 
@@ -498,10 +496,8 @@ impl KubuntuShutdownApp {
 
     fn draw_footer(&mut self, ui: &mut egui::Ui) -> bool {
         let row_width = ui.available_width();
-        let (row_rect, _) = ui.allocate_exact_size(
-            Vec2::new(row_width, CANCEL_HEIGHT),
-            Sense::hover(),
-        );
+        let (row_rect, _) =
+            ui.allocate_exact_size(Vec2::new(row_width, CANCEL_HEIGHT), Sense::hover());
 
         let btn_rect = Rect::from_min_size(
             Pos2::new(row_rect.right() - CANCEL_WIDTH, row_rect.top()),
@@ -592,37 +588,39 @@ impl eframe::App for KubuntuShutdownApp {
             .fill(self.palette.bg_main)
             .inner_margin(Margin::symmetric(OUTER_PAD_X, OUTER_PAD_Y));
 
-        egui::CentralPanel::default().frame(panel_frame).show(ui, |ui| {
-            ui.spacing_mut().item_spacing = Vec2::ZERO;
+        egui::CentralPanel::default()
+            .frame(panel_frame)
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::ZERO;
 
-            self.draw_header(ui);
-            ui.add_space(SECTION_GAP);
+                self.draw_header(ui);
+                ui.add_space(SECTION_GAP);
 
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(TILE_GAP, 0.0);
-                for (idx, action) in ACTIONS.iter().enumerate().filter(|(_, a)| a.row == 0) {
-                    if let Some(id) = self.draw_action_tile(ui, idx, action) {
-                        clicked_action = Some(id);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(TILE_GAP, 0.0);
+                    for (idx, action) in ACTIONS.iter().enumerate().filter(|(_, a)| a.row == 0) {
+                        if let Some(id) = self.draw_action_tile(ui, idx, action) {
+                            clicked_action = Some(id);
+                        }
                     }
-                }
-            });
+                });
 
-            ui.add_space(TILE_GAP);
+                ui.add_space(TILE_GAP);
 
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(TILE_GAP, 0.0);
-                for (idx, action) in ACTIONS.iter().enumerate().filter(|(_, a)| a.row == 1) {
-                    if let Some(id) = self.draw_action_tile(ui, idx, action) {
-                        clicked_action = Some(id);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(TILE_GAP, 0.0);
+                    for (idx, action) in ACTIONS.iter().enumerate().filter(|(_, a)| a.row == 1) {
+                        if let Some(id) = self.draw_action_tile(ui, idx, action) {
+                            clicked_action = Some(id);
+                        }
                     }
-                }
-            });
+                });
 
-            ui.add_space(SECTION_GAP);
-            self.draw_description_box(ui);
-            ui.add_space(SECTION_GAP);
-            cancel_clicked = self.draw_footer(ui);
-        });
+                ui.add_space(SECTION_GAP);
+                self.draw_description_box(ui);
+                ui.add_space(SECTION_GAP);
+                cancel_clicked = self.draw_footer(ui);
+            });
 
         if let Some(action_id) = clicked_action {
             self.trigger_action(&ctx, action_id);
@@ -774,9 +772,18 @@ mod tests {
             parse_cli_args(["prog", "--native"]).unwrap(),
             CliCommand::NativePrompt
         );
-        assert_eq!(parse_cli_args(["prog", "--daemon"]).unwrap(), CliCommand::Daemon);
-        assert_eq!(parse_cli_args(["prog", "--help"]).unwrap(), CliCommand::Help);
-        assert_eq!(parse_cli_args(["prog", "--version"]).unwrap(), CliCommand::Version);
+        assert_eq!(
+            parse_cli_args(["prog", "--daemon"]).unwrap(),
+            CliCommand::Daemon
+        );
+        assert_eq!(
+            parse_cli_args(["prog", "--help"]).unwrap(),
+            CliCommand::Help
+        );
+        assert_eq!(
+            parse_cli_args(["prog", "--version"]).unwrap(),
+            CliCommand::Version
+        );
         assert!(parse_cli_args(["prog", "--unknown"]).is_err());
     }
 
