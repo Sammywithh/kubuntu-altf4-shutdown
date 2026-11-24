@@ -7,6 +7,7 @@ use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use eframe::egui;
 use zbus::fdo::DBusProxy;
@@ -17,6 +18,39 @@ use crate::actions::action_kde_native_prompt;
 pub const SERVICE_NAME: &str = "org.kubuntu.ShutdownDialog";
 pub const OBJECT_PATH: &str = "/Dialog";
 pub const IFACE_PRIMARY: &str = "org.kubuntu.ShutdownDialog";
+
+const NATIVE_PROMPT_COOLDOWN: Duration = Duration::from_millis(1500);
+
+struct CooldownGate {
+    last_triggered: Mutex<Option<Instant>>,
+    cooldown: Duration,
+}
+
+impl CooldownGate {
+    fn new(cooldown: Duration) -> Self {
+        Self {
+            last_triggered: Mutex::new(None),
+            cooldown,
+        }
+    }
+
+    fn try_acquire_at(&self, now: Instant) -> bool {
+        let Ok(mut guard) = self.last_triggered.lock() else {
+            return false;
+        };
+        if let Some(prev) = *guard
+            && now.saturating_duration_since(prev) < self.cooldown
+        {
+            return false;
+        }
+        *guard = Some(now);
+        true
+    }
+
+    fn try_acquire(&self) -> bool {
+        self.try_acquire_at(Instant::now())
+    }
+}
 
 /// Trait implemented by D-Bus execution modes (GUI focus wake-up or background daemon spawner).
 pub trait DialogController: Send + Sync {
@@ -62,6 +96,7 @@ impl LocalInterface {
 pub struct GuiDialogController {
     focus_requested: Arc<AtomicBool>,
     egui_ctx: Mutex<Option<egui::Context>>,
+    native_prompt_cooldown: CooldownGate,
 }
 
 impl GuiDialogController {
@@ -69,6 +104,7 @@ impl GuiDialogController {
         Self {
             focus_requested,
             egui_ctx: Mutex::new(None),
+            native_prompt_cooldown: CooldownGate::new(NATIVE_PROMPT_COOLDOWN),
         }
     }
 
@@ -93,13 +129,16 @@ impl DialogController for GuiDialogController {
     }
 
     fn show_native_prompt(&self) {
-        let _ = action_kde_native_prompt();
+        if self.native_prompt_cooldown.try_acquire() {
+            let _ = action_kde_native_prompt();
+        }
     }
 }
 
 /// Controller used in `--daemon` mode to spawn the dialog on demand without keeping a window open.
 pub struct DaemonController {
     active_child: Mutex<Option<Child>>,
+    native_prompt_cooldown: CooldownGate,
 }
 
 impl Default for DaemonController {
@@ -112,6 +151,7 @@ impl DaemonController {
     pub fn new() -> Self {
         Self {
             active_child: Mutex::new(None),
+            native_prompt_cooldown: CooldownGate::new(NATIVE_PROMPT_COOLDOWN),
         }
     }
 
@@ -153,7 +193,9 @@ impl DialogController for DaemonController {
     }
 
     fn show_native_prompt(&self) {
-        let _ = action_kde_native_prompt();
+        if self.native_prompt_cooldown.try_acquire() {
+            let _ = action_kde_native_prompt();
+        }
     }
 }
 
@@ -231,6 +273,8 @@ pub fn run_daemon_loop() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
+    use std::sync::atomic::AtomicUsize;
 
     #[test]
     fn gui_controller_sets_focus_flag_on_show_dialog() {
@@ -244,16 +288,71 @@ mod tests {
 
     #[test]
     fn daemon_controller_detects_exited_child() {
+        let true_bin = ["/bin/true", "/usr/bin/true"]
+            .into_iter()
+            .find(|p| Path::new(p).exists())
+            .expect("/bin/true or /usr/bin/true should exist");
+
         let mut child_slot = Some(
-            Command::new("true")
+            Command::new(true_bin)
                 .spawn()
-                .expect("`true` should spawn in test"),
+                .expect("true binary should spawn in test"),
         );
-        // Wait for `true` to exit so has_active_child clears the slot.
         if let Some(child) = child_slot.as_mut() {
             let _ = child.wait();
         }
         assert!(!DaemonController::has_active_child(&mut child_slot));
         assert!(child_slot.is_none());
+    }
+
+    #[test]
+    fn cooldown_gate_debounces_repeated_calls_within_window() {
+        let gate = CooldownGate::new(NATIVE_PROMPT_COOLDOWN);
+        let t0 = Instant::now();
+
+        assert!(gate.try_acquire_at(t0));
+        assert!(!gate.try_acquire_at(t0));
+        assert!(!gate.try_acquire_at(t0 + Duration::from_millis(500)));
+        assert!(!gate.try_acquire_at(t0 + Duration::from_millis(1499)));
+
+        // Once the cooldown window has elapsed, a new call is allowed.
+        let t1 = t0 + NATIVE_PROMPT_COOLDOWN;
+        assert!(gate.try_acquire_at(t1));
+        assert!(!gate.try_acquire_at(t1 + Duration::from_millis(100)));
+    }
+
+    #[test]
+    fn shared_controller_cooldown_rate_limits_across_both_dbus_interfaces() {
+        struct CountingController {
+            gate: CooldownGate,
+            invocations: AtomicUsize,
+        }
+
+        impl DialogController for CountingController {
+            fn show_dialog(&self) {}
+
+            fn show_native_prompt(&self) {
+                if self.gate.try_acquire() {
+                    self.invocations.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+        }
+
+        let raw_controller = Arc::new(CountingController {
+            gate: CooldownGate::new(Duration::from_secs(2)),
+            invocations: AtomicUsize::new(0),
+        });
+        let dyn_ctrl: Arc<dyn DialogController> = Arc::clone(&raw_controller) as _;
+        let primary = PrimaryInterface {
+            controller: Arc::clone(&dyn_ctrl),
+        };
+        let local = LocalInterface {
+            controller: dyn_ctrl,
+        };
+
+        primary.show_native_prompt();
+        local.show_native_prompt();
+        primary.show_native_prompt();
+        assert_eq!(raw_controller.invocations.load(Ordering::SeqCst), 1);
     }
 }

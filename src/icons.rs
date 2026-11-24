@@ -3,8 +3,9 @@
 //! lookup from `/usr/share/icons/breeze*`, dynamically recolored for Dark/Light mode.
 
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use eframe::egui::{self, ColorImage, IconData, TextureHandle, TextureOptions};
@@ -13,6 +14,10 @@ use resvg::usvg;
 
 use crate::actions::ACTIONS;
 use crate::style::ThemePalette;
+
+const ICONS_SYSTEM_ROOT: &str = "/usr/share/icons";
+const MAX_SVG_FILE_BYTES: usize = 256 * 1024;
+const MAX_ICON_NAME_LEN: usize = 128;
 
 const SVG_KDE_LOGO: &str = r##"<svg height="48" width="48" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><linearGradient id="a"><stop offset="0"/><stop offset="1" stop-opacity="0"/></linearGradient><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="16" x2="34.942" xlink:href="#a" y1="11" y2="29.942"/><linearGradient id="c" gradientTransform="matrix(.70710678 .70710678 -.70710678 .70710678 0 0)" gradientUnits="userSpaceOnUse" x1="31.021" x2="43.104" xlink:href="#a" y1="-9.896" y2="-9.896"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="23.716" x2="26.348" xlink:href="#a" y1="13.219" y2="15.851"/><linearGradient id="e" gradientTransform="matrix(1.0454421 0 0 1.0298842 46.076843 3.856842)" gradientUnits="userSpaceOnUse" x1="-45.221867" x2=".691726" y1="-4.91011" y2="41.697075"><stop offset="0" stop-color="#2bc0ff"/><stop offset="1" stop-color="#1d99f3"/></linearGradient><path d="m5.9999998-.00000914h36.0000012c3.600001 0 6.000001 2.40000654 6.000001 6.00000714v36c0 3.600002-2.4 6.000008-6.000001 6.000008h-36.0000012c-3.6000002 0-6.00000022-2.400006-6.00000022-6.000008v-36c0-3.6000006 2.40000002-6.00000714 6.00000022-6.00000714z" fill="url(#e)" transform="matrix(.83333329 0 0 .83333329 4 4.000002)"/><g transform="translate(-38 -2)"><circle cx="24" cy="24" opacity=".539" r="7"/><circle cx="24" cy="24" opacity=".539" r="9"/><path d="m22.5 11c-.277 0-.5.223-.5.5l-1 4.5v8 8l1 4.5c0 .277.223.5.5.5h3c.277 0 .43991-.229596.5-.5l1-4.5v-8-8l-1-4.5c-.06009-.270404-.223-.5-.5-.5z" opacity=".539"/><path d="m13.746952 15.868272c-.195869.195869-.195869.511238 0 .707107l2.474873 3.889087 5.656855 5.656854 5.656854 5.656855 3.889087 2.474873c.195869.195869.511238.195869.707107 0l2.12132-2.12132c.195869-.195869.148715-.473412 0-.707107l-2.474873-3.889087-5.656855-5.656854-5.656854-5.656855-3.889087-2.474873c-.233695-.148715-.511238-.195869-.707107 0z" opacity=".539"/><path d="m34.235965 15.868272c.195869.195869.195869.511238 0 .707107l-2.474873 3.889087-5.656855 5.656854-5.656854 5.656855-3.889087 2.474873c-.195869.195869-.511238.195869-.707107 0l-2.12132-2.12132c-.195869-.195869-.148715-.473412 0-.707107l2.474873-3.889087 5.656855-5.656854 5.656854-5.656855 3.889087-2.474873c.233695-.148715.511238-.195869.707107 0z" opacity=".539"/><path d="m37 22.5c0-.277-.223-.5-.5-.5l-4.5-1h-8-8l-4.5 1c-.277 0-.5.223-.5.5v3c0 .277.229596.43991.5.5l4.5 1h8 8l4.5-1c.270404-.06009.5-.223.5-.5z" opacity=".539"/></g><path d="m22.162109 18.726562-2.193359-2.193359-2.304688 1.455078-.867187 1.992188-6.75 6.75 4.607422 4.607422-1.964844 1.748047 9.914063 9.914062h14.208984c2.874065 0 5.1875-2.280321 5.1875-5.111328-8.496284-10.482081-18-21.888672-19.837891-19.16211z" fill="url(#b)" opacity=".2"/><path d="m36.970703 10.988281-4.369141 1.177735-4.519531 9.5 3.917969 8.328125 11.285156 11.285156c.45228-.7842.714844-1.690387.714844-2.660156v-20.601563z" fill="url(#c)" opacity=".2"/><path d="m26.000804 9.9953918 4.531314 4.5313142-3.142254 6.655326-6.28785-6.28785z" fill="url(#d)" opacity=".2"/><path d="m15.208984 14.617188c-.123062-.0059-.241909.03097-.339843.128906l-2.123047 2.123047c-.195869.195869-.195869.511162 0 .707031l2.193359 3.445312c-.175549.354193-.327571.719568-.455078 1.09375l-3.984375.884766c-.277 0-.5.223-.5.5v3c0 .277.229596.43991.5.5l3.986328.886719c.12346.370523.270907.732616.441406 1.083984l-2.197265 3.453125c-.148715.233695-.195869.511162 0 .707031l2.121093 2.123047c.19587.195869.511163.195869.707032 0l3.453125-2.199218c.357212.177942.725864.331927 1.103515.460937l.884766 3.984375c0 .277.223.5.5.5h3c.277 0 .43991-.229596.5-.5l.886719-3.986328c.376029-.125362.743365-.275428 1.099609-.449219l3.4375 2.189453c.195869.195869.511162.195869.707031 0l2.123047-2.123047c.195869-.195869.148715-.473336 0-.707031l-.9375-1.472656-.699218.279297-2.240235-3.359375c-1.128979 2.510379-3.624392 4.126092-6.376953 4.128906-3.865993 0-7-3.134007-7-7 .0031-2.700827 1.559779-5.15891 4-6.316406v-2.152344c-.336475.11516-.665829.250162-.986328.404297l-3.4375-2.189453c-.116848-.07436-.244125-.123012-.367188-.128906z" fill="#fff"/><path d="m26 10-5 .462891v19.537109l5-1v-8l6 9 5-2-6.5-8.414062 6.503906-8.585938-5.236328-1-5.767578 8.5z" fill="#fff"/><path d="m4 38v1c0 3 2 5 5 5h30c3 0 5-2 5-5v-1c0 3-2 5-5 5h-30c-3 0-5-2-5-5z" opacity=".2"/></svg>"##;
 
@@ -135,6 +140,49 @@ pub fn build_window_icon() -> Option<Arc<IconData>> {
     }))
 }
 
+fn is_valid_icon_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= MAX_ICON_NAME_LEN
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+fn read_bounded_svg_file(path: &Path) -> Option<String> {
+    let file = File::open(path).ok()?;
+    let meta = file.metadata().ok()?;
+    if !meta.is_file() || meta.len() > MAX_SVG_FILE_BYTES as u64 {
+        return None;
+    }
+
+    let mut buf = Vec::with_capacity((meta.len() as usize).min(MAX_SVG_FILE_BYTES));
+    let bytes_read = file
+        .take((MAX_SVG_FILE_BYTES as u64) + 1)
+        .read_to_end(&mut buf)
+        .ok()?;
+    if bytes_read > MAX_SVG_FILE_BYTES {
+        return None;
+    }
+
+    String::from_utf8(buf).ok()
+}
+
+fn disk_candidates_in_root(icons_root: &Path, name: &str, dark: bool) -> Vec<PathBuf> {
+    if name == "kde" {
+        vec![icons_root.join("breeze/apps/48/kde.svg")]
+    } else if dark {
+        vec![
+            icons_root.join(format!("breeze-dark/actions/32/{name}.svg")),
+            icons_root.join(format!("breeze/actions/32/{name}.svg")),
+        ]
+    } else {
+        vec![
+            icons_root.join(format!("breeze/actions/32/{name}.svg")),
+            icons_root.join(format!("breeze-dark/actions/32/{name}.svg")),
+        ]
+    }
+}
+
 fn embedded_svg(name: &str) -> Option<&'static str> {
     match name {
         "kde" => Some(SVG_KDE_LOGO),
@@ -150,30 +198,26 @@ fn embedded_svg(name: &str) -> Option<&'static str> {
     }
 }
 
-fn load_svg_source(name: &str, dark: bool) -> Option<String> {
-    let disk_candidates: Vec<String> = if name == "kde" {
-        vec!["/usr/share/icons/breeze/apps/48/kde.svg".to_string()]
-    } else if dark {
-        vec![
-            format!("/usr/share/icons/breeze-dark/actions/32/{name}.svg"),
-            format!("/usr/share/icons/breeze/actions/32/{name}.svg"),
-        ]
-    } else {
-        vec![
-            format!("/usr/share/icons/breeze/actions/32/{name}.svg"),
-            format!("/usr/share/icons/breeze-dark/actions/32/{name}.svg"),
-        ]
-    };
+fn load_svg_source_from_root(icons_root: &Path, name: &str, dark: bool) -> Option<String> {
+    if !is_valid_icon_name(name) {
+        return None;
+    }
 
-    for path in disk_candidates {
-        if Path::new(&path).is_file()
-            && let Ok(content) = fs::read_to_string(&path)
+    let options = usvg::Options::default();
+    for path in disk_candidates_in_root(icons_root, name, dark) {
+        if let Some(content) = read_bounded_svg_file(&path)
+            && usvg::Tree::from_str(&content, &options).is_ok()
         {
             return Some(content);
         }
     }
 
     embedded_svg(name).map(str::to_string)
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+fn load_svg_source(name: &str, dark: bool) -> Option<String> {
+    load_svg_source_from_root(Path::new(ICONS_SYSTEM_ROOT), name, dark)
 }
 
 /// Normalizes KDE `.ColorScheme-Text` and `currentColor` references for `resvg`.
@@ -189,13 +233,49 @@ pub fn apply_color_scheme(svg: &str, icon_color_hex: &str) -> String {
         .replace("currentColor", icon_color_hex)
 }
 
-/// Rasterizes a named Breeze SVG icon into a premultiplied `tiny_skia::Pixmap` of `size x size`.
-pub fn rasterize_svg_icon(name: &str, palette: &ThemePalette, size: u32) -> Option<Pixmap> {
-    let raw_svg = load_svg_source(name, palette.dark)?;
-    let themed_svg = apply_color_scheme(&raw_svg, palette.icon_color_hex);
+fn parse_themed_svg_tree(
+    raw_svg: &str,
+    palette: &ThemePalette,
+    options: &usvg::Options<'_>,
+) -> Option<usvg::Tree> {
+    let themed_svg = apply_color_scheme(raw_svg, palette.icon_color_hex);
+    let tree = usvg::Tree::from_str(&themed_svg, options).ok()?;
+    if tree.size().width() > 0.0 && tree.size().height() > 0.0 {
+        Some(tree)
+    } else {
+        None
+    }
+}
+
+fn load_svg_tree_from_root(
+    icons_root: &Path,
+    name: &str,
+    palette: &ThemePalette,
+) -> Option<usvg::Tree> {
+    if !is_valid_icon_name(name) {
+        return None;
+    }
 
     let options = usvg::Options::default();
-    let tree = usvg::Tree::from_str(&themed_svg, &options).ok()?;
+    for path in disk_candidates_in_root(icons_root, name, palette.dark) {
+        if let Some(disk_svg) = read_bounded_svg_file(&path)
+            && let Some(tree) = parse_themed_svg_tree(&disk_svg, palette, &options)
+        {
+            return Some(tree);
+        }
+    }
+
+    let fallback = embedded_svg(name)?;
+    parse_themed_svg_tree(fallback, palette, &options)
+}
+
+fn rasterize_svg_icon_from_root(
+    icons_root: &Path,
+    name: &str,
+    palette: &ThemePalette,
+    size: u32,
+) -> Option<Pixmap> {
+    let tree = load_svg_tree_from_root(icons_root, name, palette)?;
     let mut pixmap = Pixmap::new(size, size)?;
 
     let svg_size = tree.size();
@@ -208,6 +288,11 @@ pub fn rasterize_svg_icon(name: &str, palette: &ThemePalette, size: u32) -> Opti
 
     resvg::render(&tree, transform, &mut pixmap.as_mut());
     Some(pixmap)
+}
+
+/// Rasterizes a named Breeze SVG icon into a premultiplied `tiny_skia::Pixmap` of `size x size`.
+pub fn rasterize_svg_icon(name: &str, palette: &ThemePalette, size: u32) -> Option<Pixmap> {
+    rasterize_svg_icon_from_root(Path::new(ICONS_SYSTEM_ROOT), name, palette, size)
 }
 
 fn load_texture(
@@ -233,6 +318,9 @@ fn load_texture(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
+    use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     const ALL_ICON_NAMES: [&str; 9] = [
         "kde",
@@ -245,6 +333,31 @@ mod tests {
         "system-switch-user",
         "dialog-cancel",
     ];
+
+    struct TempIconDir {
+        path: PathBuf,
+    }
+
+    impl TempIconDir {
+        fn new(label: &str) -> Self {
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = env::temp_dir().join(format!(
+                "kubuntu-shutdown-icons-test-{}-{}-{}",
+                std::process::id(),
+                label,
+                id
+            ));
+            fs::create_dir_all(&path).expect("failed to create temp icon dir");
+            Self { path }
+        }
+    }
+
+    impl Drop for TempIconDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
 
     #[test]
     fn all_embedded_svgs_rasterize_in_dark_and_light_modes() {
@@ -294,5 +407,89 @@ mod tests {
         assert_eq!(icon.width, 64);
         assert_eq!(icon.height, 64);
         assert_eq!(icon.rgba.len(), 64 * 64 * 4);
+    }
+
+    #[test]
+    fn icon_name_validation_enforces_strict_ascii_allowlist() {
+        for icon in ALL_ICON_NAMES {
+            assert!(is_valid_icon_name(icon), "{icon} should be valid");
+        }
+        for action in ACTIONS {
+            assert!(is_valid_icon_name(action.icon));
+            assert!(is_valid_icon_name(action.fallback_icon));
+        }
+
+        let invalid_names = [
+            "",
+            "../etc/passwd",
+            "system-shutdown/../../etc",
+            "System-Shutdown",
+            "system_shutdown",
+            "system-shutdown.svg",
+            "icon/name",
+            "icon\\name",
+            "icon name",
+            "icon\0name",
+        ];
+        for bad in invalid_names {
+            assert!(!is_valid_icon_name(bad), "{bad:?} must be rejected");
+            assert!(load_svg_source(bad, true).is_none());
+        }
+
+        let too_long = "a".repeat(MAX_ICON_NAME_LEN + 1);
+        assert!(!is_valid_icon_name(&too_long));
+    }
+
+    #[test]
+    fn bounded_svg_loader_enforces_256_kib_limit_and_falls_back() {
+        let tmp = TempIconDir::new("size-limit");
+        let dark_actions = tmp.path.join("breeze-dark/actions/32");
+        fs::create_dir_all(&dark_actions).unwrap();
+
+        let exact_path = dark_actions.join("exact.svg");
+        let prefix = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><!--";
+        let suffix = "--></svg>";
+        let pad_len = MAX_SVG_FILE_BYTES - prefix.len() - suffix.len();
+        let exact_svg = format!("{prefix}{}{suffix}", "a".repeat(pad_len));
+        assert_eq!(exact_svg.len(), MAX_SVG_FILE_BYTES);
+        fs::write(&exact_path, &exact_svg).unwrap();
+        assert_eq!(read_bounded_svg_file(&exact_path), Some(exact_svg));
+
+        let oversized_path = dark_actions.join("system-reboot.svg");
+        let oversized_svg = format!("{prefix}{}{suffix}", "a".repeat(pad_len + 1));
+        assert_eq!(oversized_svg.len(), MAX_SVG_FILE_BYTES + 1);
+        fs::write(&oversized_path, &oversized_svg).unwrap();
+        assert!(read_bounded_svg_file(&oversized_path).is_none());
+
+        // Oversized disk SVG must fall back to the embedded SVG.
+        let fallback_source = load_svg_source_from_root(&tmp.path, "system-reboot", true)
+            .expect("should fall back to embedded SVG");
+        assert_eq!(fallback_source, SVG_SYSTEM_REBOOT);
+    }
+
+    #[test]
+    fn corrupt_disk_svg_falls_back_to_embedded_svg_when_usvg_fails() {
+        let tmp = TempIconDir::new("corrupt-svg");
+        let dark_actions = tmp.path.join("breeze-dark/actions/32");
+        let light_actions = tmp.path.join("breeze/actions/32");
+        fs::create_dir_all(&dark_actions).unwrap();
+        fs::create_dir_all(&light_actions).unwrap();
+
+        fs::write(
+            dark_actions.join("system-shutdown.svg"),
+            "<svg><corrupt-unclosed",
+        )
+        .unwrap();
+        fs::write(light_actions.join("system-shutdown.svg"), "not xml at all").unwrap();
+
+        let loaded = load_svg_source_from_root(&tmp.path, "system-shutdown", true)
+            .expect("corrupt disk SVG should fall back to embedded source");
+        assert_eq!(loaded, SVG_SYSTEM_SHUTDOWN);
+
+        let palette = ThemePalette::for_mode(true);
+        let pixmap = rasterize_svg_icon_from_root(&tmp.path, "system-shutdown", &palette, 64)
+            .expect("corrupt disk SVG should still rasterize via embedded fallback");
+        let non_transparent = pixmap.pixels().iter().filter(|p| p.alpha() > 0).count();
+        assert!(non_transparent > 10);
     }
 }

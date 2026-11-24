@@ -1,6 +1,8 @@
 //! Kubuntu 26.04 Style Alt+F4 Smart Shutdown Dialog.
 //! Native Rust implementation using `eframe`/`egui`, `resvg`, and `zbus` in KDE Breeze design.
 
+#![forbid(unsafe_code)]
+
 mod actions;
 mod dbus;
 mod icons;
@@ -11,6 +13,7 @@ use std::fs;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use eframe::egui::{
     self, Align2, Color32, CornerRadius, CursorIcon, FontData, FontDefinitions, FontFamily, FontId,
@@ -37,6 +40,11 @@ const TILE_GAP: f32 = 12.0;
 const DESCRIPTION_HEIGHT: f32 = 44.0;
 const CANCEL_WIDTH: f32 = 126.0;
 const CANCEL_HEIGHT: f32 = 34.0;
+
+const INITIAL_FOCUS_TARGET: FocusTarget = FocusTarget::Action(0);
+const STARTUP_INPUT_GUARD: Duration = Duration::from_millis(150);
+const DESTRUCTIVE_INPUT_GUARD: Duration = Duration::from_millis(300);
+const CANCEL_DESCRIPTION: &str = "Schließt diesen Dialog, ohne eine Aktion auszuführen.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FocusTarget {
@@ -115,6 +123,29 @@ impl FocusTarget {
                 Self::Cancel => Self::Action(0),
             }
         }
+    }
+}
+
+fn is_action_allowed(action: &ActionInfo, elapsed: Duration, via_keyboard: bool) -> bool {
+    if action.destructive {
+        elapsed >= DESTRUCTIVE_INPUT_GUARD
+    } else if via_keyboard {
+        elapsed >= STARTUP_INPUT_GUARD
+    } else {
+        true
+    }
+}
+
+fn description_for_state(
+    hovered_action: Option<usize>,
+    focused_target: FocusTarget,
+) -> &'static str {
+    if let Some(idx) = hovered_action {
+        return ACTIONS[idx].description;
+    }
+    match focused_target {
+        FocusTarget::Action(idx) => ACTIONS[idx].description,
+        FocusTarget::Cancel => CANCEL_DESCRIPTION,
     }
 }
 
@@ -226,6 +257,7 @@ struct KubuntuShutdownApp {
     icons: IconSet,
     focused_target: FocusTarget,
     hovered_action: Option<usize>,
+    opened_at: Instant,
     selected_action: Arc<Mutex<Option<ActionId>>>,
     focus_requested: Arc<AtomicBool>,
 }
@@ -258,21 +290,16 @@ impl KubuntuShutdownApp {
         Self {
             palette,
             icons,
-            focused_target: FocusTarget::Action(0),
+            focused_target: INITIAL_FOCUS_TARGET,
             hovered_action: None,
+            opened_at: Instant::now(),
             selected_action,
             focus_requested,
         }
     }
 
     fn active_description(&self) -> &'static str {
-        if let Some(idx) = self.hovered_action {
-            return ACTIONS[idx].description;
-        }
-        match self.focused_target {
-            FocusTarget::Action(idx) => ACTIONS[idx].description,
-            FocusTarget::Cancel => ACTIONS[0].description,
-        }
+        description_for_state(self.hovered_action, self.focused_target)
     }
 
     fn trigger_action(&mut self, ctx: &egui::Context, action_id: ActionId) {
@@ -282,7 +309,7 @@ impl KubuntuShutdownApp {
         ctx.send_viewport_cmd(ViewportCommand::Close);
     }
 
-    fn handle_keyboard_input(&mut self, ctx: &egui::Context) {
+    fn handle_keyboard_input(&mut self, ctx: &egui::Context, elapsed: Duration) {
         let mut close_without_action = false;
         let mut chosen_action: Option<(usize, ActionId)> = None;
 
@@ -307,7 +334,10 @@ impl KubuntuShutdownApp {
             if input.key_pressed(Key::Enter) || input.key_pressed(Key::Space) {
                 match self.focused_target {
                     FocusTarget::Action(idx) => {
-                        chosen_action = Some((idx, ACTIONS[idx].id));
+                        let action = &ACTIONS[idx];
+                        if is_action_allowed(action, elapsed, true) {
+                            chosen_action = Some((idx, action.id));
+                        }
                     }
                     FocusTarget::Cancel => {
                         close_without_action = true;
@@ -321,7 +351,10 @@ impl KubuntuShutdownApp {
                     if let egui::Event::Text(text) = event {
                         for ch in text.chars() {
                             if let Some(idx) = actions::index_for_hotkey(ch) {
-                                chosen_action = Some((idx, ACTIONS[idx].id));
+                                let action = &ACTIONS[idx];
+                                if is_action_allowed(action, elapsed, true) {
+                                    chosen_action = Some((idx, action.id));
+                                }
                                 return;
                             }
                         }
@@ -339,7 +372,10 @@ impl KubuntuShutdownApp {
                 ];
                 for (key, idx) in key_hotkeys {
                     if input.key_pressed(key) {
-                        chosen_action = Some((idx, ACTIONS[idx].id));
+                        let action = &ACTIONS[idx];
+                        if is_action_allowed(action, elapsed, true) {
+                            chosen_action = Some((idx, action.id));
+                        }
                         return;
                     }
                 }
@@ -395,6 +431,7 @@ impl KubuntuShutdownApp {
         ui: &mut egui::Ui,
         idx: usize,
         action: &ActionInfo,
+        elapsed: Duration,
     ) -> Option<ActionId> {
         let (rect, response) =
             ui.allocate_exact_size(Vec2::new(TILE_WIDTH, TILE_HEIGHT), Sense::click());
@@ -456,7 +493,7 @@ impl KubuntuShutdownApp {
             self.palette.text_primary,
         );
 
-        if response.clicked() {
+        if response.clicked() && is_action_allowed(action, elapsed, false) {
             self.focused_target = FocusTarget::Action(idx);
             return Some(action.id);
         }
@@ -574,11 +611,17 @@ impl eframe::App for KubuntuShutdownApp {
         if self.focus_requested.swap(false, Ordering::SeqCst) {
             self.palette = ThemePalette::detect();
             self.icons = IconSet::load(&ctx, &self.palette);
-            self.focused_target = FocusTarget::Action(0);
+            self.focused_target = INITIAL_FOCUS_TARGET;
+            self.opened_at = Instant::now();
             ctx.send_viewport_cmd(ViewportCommand::Focus);
         }
 
-        self.handle_keyboard_input(&ctx);
+        let elapsed = self.opened_at.elapsed();
+        if elapsed < DESTRUCTIVE_INPUT_GUARD {
+            ctx.request_repaint_after(DESTRUCTIVE_INPUT_GUARD - elapsed);
+        }
+
+        self.handle_keyboard_input(&ctx, elapsed);
         self.hovered_action = None;
 
         let mut clicked_action: Option<ActionId> = None;
@@ -599,7 +642,7 @@ impl eframe::App for KubuntuShutdownApp {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(TILE_GAP, 0.0);
                     for (idx, action) in ACTIONS.iter().enumerate().filter(|(_, a)| a.row == 0) {
-                        if let Some(id) = self.draw_action_tile(ui, idx, action) {
+                        if let Some(id) = self.draw_action_tile(ui, idx, action, elapsed) {
                             clicked_action = Some(id);
                         }
                     }
@@ -610,7 +653,7 @@ impl eframe::App for KubuntuShutdownApp {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(TILE_GAP, 0.0);
                     for (idx, action) in ACTIONS.iter().enumerate().filter(|(_, a)| a.row == 1) {
-                        if let Some(id) = self.draw_action_tile(ui, idx, action) {
+                        if let Some(id) = self.draw_action_tile(ui, idx, action, elapsed) {
                             clicked_action = Some(id);
                         }
                     }
@@ -630,22 +673,7 @@ impl eframe::App for KubuntuShutdownApp {
     }
 }
 
-fn configure_display_backend() {
-    // Prefer X11 / XWayland when DISPLAY is available so KWin centers the dialog window,
-    // honors AlwaysOnTop / _NET_WM_WINDOW_TYPE_DIALOG, and draws native Breeze borders.
-    if env::var_os("WINIT_UNIX_BACKEND").is_none()
-        && env::var_os("DISPLAY").is_some_and(|v| !v.is_empty())
-    {
-        // Safety: called at startup on the main thread before spawning any worker threads.
-        unsafe {
-            env::set_var("WINIT_UNIX_BACKEND", "x11");
-        }
-    }
-}
-
 fn run_dialog(register_dbus: bool) -> Result<Option<ActionId>, eframe::Error> {
-    configure_display_backend();
-
     if register_dbus && try_activate_existing_instance() {
         return Ok(None);
     }
@@ -785,6 +813,49 @@ mod tests {
             CliCommand::Version
         );
         assert!(parse_cli_args(["prog", "--unknown"]).is_err());
+    }
+
+    #[test]
+    fn initial_focus_targets_shutdown_and_cancel_displays_cancel_description() {
+        assert_eq!(INITIAL_FOCUS_TARGET, FocusTarget::Action(0));
+        assert_eq!(ACTIONS[0].id, ActionId::Shutdown);
+
+        assert_eq!(
+            description_for_state(None, INITIAL_FOCUS_TARGET),
+            ACTIONS[0].description
+        );
+        assert_eq!(
+            description_for_state(None, FocusTarget::Cancel),
+            CANCEL_DESCRIPTION
+        );
+        assert_eq!(
+            description_for_state(Some(5), FocusTarget::Cancel),
+            ACTIONS[5].description
+        );
+    }
+
+    #[test]
+    fn startup_input_guard_protects_destructive_and_keyboard_actions() {
+        for action in &ACTIONS {
+            if action.destructive {
+                assert!(!is_action_allowed(action, Duration::ZERO, true));
+                assert!(!is_action_allowed(action, Duration::ZERO, false));
+                assert!(!is_action_allowed(action, Duration::from_millis(299), true));
+                assert!(!is_action_allowed(
+                    action,
+                    Duration::from_millis(299),
+                    false
+                ));
+                assert!(is_action_allowed(action, DESTRUCTIVE_INPUT_GUARD, true));
+                assert!(is_action_allowed(action, DESTRUCTIVE_INPUT_GUARD, false));
+            } else {
+                // Pointer click on non-destructive tiles is allowed, keyboard has 150ms bounce guard.
+                assert!(is_action_allowed(action, Duration::ZERO, false));
+                assert!(!is_action_allowed(action, Duration::ZERO, true));
+                assert!(!is_action_allowed(action, Duration::from_millis(149), true));
+                assert!(is_action_allowed(action, STARTUP_INPUT_GUARD, true));
+            }
+        }
     }
 
     #[test]
