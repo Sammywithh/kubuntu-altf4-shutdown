@@ -3,7 +3,13 @@
 # Uninstallation Script: Kubuntu 26.04 Alt+F4 Smart Shutdown Dialog
 # ==============================================================================
 
-set -e
+set -euo pipefail
+
+: "${HOME:?HOME ist nicht gesetzt}"
+if [[ "${HOME}" != /* || "${HOME}" == "/" ]]; then
+    echo "Fehler: Ungültiger HOME-Pfad: ${HOME}" >&2
+    exit 1
+fi
 
 BIN_DIR="${HOME}/.local/bin"
 KWIN_SCRIPT_DIR="${HOME}/.local/share/kwin/scripts/kubuntu-altf4-shutdown"
@@ -15,16 +21,16 @@ echo ""
 
 # 1. Restore original KWin shortcut
 echo "[1/4] Stelle originale Alt+F4 Tastenkombination wieder her..."
-if command -v kwriteconfig6 &> /dev/null; then
+if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Window Close" "Alt+F4,Alt+F4,Fenster schließen"
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "AltF4DesktopShutdown" "none,Alt+F4,Fenster schließen oder Herunterfahren-Menü anzeigen"
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "kubuntu-altf4-shutdown:AltF4DesktopShutdown" "none,none,"
     kwriteconfig6 --file kwinrc --group Plugins --key "kubuntu-altf4-shutdownEnabled" "false"
 
-    if command -v qdbus6 &> /dev/null; then
+    if command -v qdbus6 >/dev/null 2>&1; then
         qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
     fi
-elif command -v kwriteconfig5 &> /dev/null; then
+elif command -v kwriteconfig5 >/dev/null 2>&1; then
     kwriteconfig5 --file kglobalshortcutsrc --group kwin --key "Window Close" "Alt+F4,Alt+F4,Fenster schließen"
     kwriteconfig5 --file kglobalshortcutsrc --group kwin --key "AltF4DesktopShutdown" "none,Alt+F4,Fenster schließen oder Herunterfahren-Menü anzeigen"
     kwriteconfig5 --file kwinrc --group Plugins --key "kubuntu-altf4-shutdownEnabled" "false"
@@ -46,7 +52,7 @@ rm -rf "${HOME}/.local/share/kubuntu-shutdown-dialog"
 
 echo ""
 echo "============================================================"
-echo "  Deinstallation erfolgreich abgeschlossen!"
+echo "  Deinstallation erfolgreich abgeschlossen."
 echo "  KDE Plasma Standardverhalten wurde wiederhergestellt."
 echo "============================================================"
 echo ""

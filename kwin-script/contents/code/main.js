@@ -46,29 +46,10 @@ function isCloseableWindow(w) {
 function showShutdownMenu() {
     console.info("Kubuntu Alt+F4: Calling showShutdownMenu via DBus...");
 
-    // 1. Call via org.kubuntu.ShutdownDialog interface
     callDBus(
         "org.kubuntu.ShutdownDialog",
         "/Dialog",
         "org.kubuntu.ShutdownDialog",
-        "showDialog",
-        function() {}
-    );
-
-    // 2. Call via local.DBusService interface
-    callDBus(
-        "org.kubuntu.ShutdownDialog",
-        "/Dialog",
-        "local.DBusService",
-        "showDialog",
-        function() {}
-    );
-
-    // 3. Call without interface specification
-    callDBus(
-        "org.kubuntu.ShutdownDialog",
-        "/Dialog",
-        "",
         "showDialog",
         function() {}
     );
@@ -76,10 +57,11 @@ function showShutdownMenu() {
 
 function handleAltF4() {
     var win = workspace.activeWindow;
-    console.info("Kubuntu Alt+F4 triggered. Active window:", win ? (win.caption || win.resourceClass) : "null");
+    var winClass = win ? (win.resourceClass || "unknown") : "none";
+    console.info("Kubuntu Alt+F4 triggered. Active window class:", winClass);
 
     if (isCloseableWindow(win)) {
-        console.info("Kubuntu Alt+F4: Closing active window:", win.caption);
+        console.info("Kubuntu Alt+F4: Closing active window of class:", winClass);
         win.closeWindow();
     } else {
         showShutdownMenu();

@@ -1,82 +1,94 @@
 # Kubuntu 26.04 Alt+F4 Smart Shutdown Dialog
 
-Ein modernes, natives **Herunterfahren- und Abmelde-Menü für Kubuntu (KDE Plasma 6)** in **Rust** (`eframe`/`egui`, `resvg`, `zbus`) im Stil von Kubuntu 26.04 / KDE Breeze, gesteuert über **`Alt + F4`**.
+Natives Herunterfahren- und Abmeldemenü für Kubuntu (KDE Plasma 6) in Rust (`eframe`/`egui`, `resvg`, `zbus`) im KDE-Breeze-Design, gesteuert über `Alt + F4`.
 
 ---
 
-## ✨ Highlights & Funktionen
+## Funktionen
 
-- **Intelligente `Alt + F4`-Erkennung**:
-  - Wenn ein normales Anwendungsfenster aktiv ist: **`Alt + F4` schließt das Fenster** (Standardverhalten).
-  - Wenn der Desktop aktiv ist (oder alle Fenster minimiert/geschlossen sind): **`Alt + F4` öffnet das Kubuntu Herunterfahren-Menü**.
-- **Authentisches Kubuntu 26.04 / KDE Breeze Design**:
-  - Große, übersichtliche Aktionskacheln mit originalen KDE Breeze System-Icons:
-    - **Herunterfahren** (`H` / Enter)
+- **Kontextabhängige `Alt + F4`-Steuerung**:
+  - Aktives Anwendungsfenster: `Alt + F4` schließt das Fenster (Standardverhalten).
+  - Aktiver Desktop (oder alle Fenster minimiert/geschlossen): `Alt + F4` öffnet das Herunterfahren-Menü.
+- **KDE-Breeze-Oberfläche**:
+  - Sieben Aktionskacheln mit KDE-Breeze-System-Icons:
+    - **Herunterfahren** (`H` / `Enter`)
     - **Neu starten** (`N`)
     - **Energie sparen** (`E`)
     - **Ruhezustand** (`R`)
     - **Abmelden** (`A`)
     - **Sperren** (`S`)
     - **Benutzer wechseln** (`B`)
-  - **Dynamischer Informationstext**: Zeigt bei Hover oder Tastaturfokus eine genaue Beschreibung der gewählten Aktion an.
-  - **Volle Tastatursteuerung**: Navigation mit Pfeiltasten und `Tab`/`Shift+Tab`, Schnelltasten (`H`, `N`, `E`, `R`, `A`, `S`, `B`), `Enter`/`Leertaste` zum Bestätigen und `Esc` zum Abbrechen.
-  - **Automatisches Dark / Light Theme**: Liest `~/.config/kdeglobals` und passt Farben sowie SVG-Icons automatisch an KDE Breeze Dark / Light an.
-- **Natives Rust-Binary (Zero Python Runtime, Zero CPU im Hintergrund)**:
-  - Wird als schnelles natives Binary per D-Bus On-Demand aktiviert (`org.kubuntu.ShutdownDialog` auf `/Dialog`) und benötigt keine Python- oder PyQt-Abhängigkeiten zur Laufzeit.
+  - **Dynamische Beschreibung**: Zeigt bei Maus-Hover oder Tastaturfokus eine Beschreibung der gewählten Aktion an.
+  - **Tastatursteuerung**: Navigation über Pfeiltasten und `Tab`/`Shift+Tab`, Schnelltasten (`H`, `N`, `E`, `R`, `A`, `S`, `B`), `Enter`/`Leertaste` zum Bestätigen und `Esc` zum Abbrechen.
+  - **Automatisches Dark / Light Theme**: Liest `~/.config/kdeglobals` und passt Farbpalette sowie SVG-Icons an KDE Breeze Dark bzw. Light an.
+- **Natives Rust-Binary und D-Bus-Integration**:
+  - On-Demand-Aktivierung über den Session-Bus (`org.kubuntu.ShutdownDialog` auf `/Dialog`), direkte System- und Session-D-Bus-Aufrufe über `zbus` ohne Laufzeitabhängigkeit von Python oder PyQt.
 
 ---
 
-## 🛠️ Kompilieren & Installation
+## Kompilieren und Installation
 
 ### Voraussetzungen zum Selbstkompilieren
-- Rust Toolchain (`cargo` / `rustc` ≥ 1.95)
 
-### Bauen & Installieren
+- Rust Toolchain (`cargo` / `rustc` >= 1.95)
+
+### Bauen und Installieren aus dem Quellcode
+
 ```bash
 git clone https://github.com/Sammywithh/kubuntu-altf4-shutdown.git
 cd kubuntu-altf4-shutdown
-cargo build --release --locked
 ./install.sh
 ```
 
-> **Hinweis**: Wenn du ein vorkompiliertes Linux-Release-Archiv aus den GitHub Releases / Actions-Artefakten entpackst, erkennt `./install.sh` das beiliegende `kubuntu-shutdown-dialog`-Binary automatisch und installiert es ohne Cargo.
+Sofern `Cargo.toml` vorliegt, kompiliert `./install.sh` das Release-Binary reproduzierbar aus dem Quellcode (`cargo build --release --locked`). Wird `./install.sh` aus einem entpackten Linux-Release-Archiv ohne `Cargo.toml` ausgeführt, installiert es das enthaltene vorkompilierte Binary.
 
-Das Installationsskript:
-1. Installiert das native Rust-Binary nach `~/.local/bin/kubuntu-shutdown-dialog`.
-2. Registriert den D-Bus Dienst für On-Demand-Aktivierung.
-3. Installiert das KWin 6 Skript für intelligentes `Alt+F4`.
-4. Schaltet die Tastenkombination `Alt+F4` live scharf.
+Ablauf der Installation:
+1. Installiert das Binary nach `~/.local/bin/kubuntu-shutdown-dialog` (`0755`).
+2. Erstellt die D-Bus-Service-Datei und den Desktop-Starter aus Vorlagen (`0644`).
+3. Installiert das KWin-6-Skript für die `Alt + F4`-Erkennung.
+4. Konfiguriert das KWin-Plugin und die Tastenkombination `Alt + F4`.
 
 ---
 
-## 🧪 Testen & Optionen
+## Testen und CLI-Optionen
 
-Direktes Starten des Menüs (kompiliert bei Bedarf automatisch im Release-Modus):
+Direktes Kompilieren und Starten des Menüs aus dem Arbeitsverzeichnis:
+
 ```bash
 ./test_dialog.sh
 ```
 
-Verfügbare CLI-Flags von `kubuntu-shutdown-dialog`:
-- `--native`: Öffnet direkt das offizielle KDE Plasma 6 Abmeldemenü.
-- `--daemon`: Startet den schlanken D-Bus-Hintergrunddienst ohne offenes Fenster.
-- `--no-dbus`: Öffnet den Dialog direkt ohne D-Bus-Registrierung.
-- `--help` / `--version`: Zeigt Hilfe bzw. Version an.
+Verfügbare Optionen von `kubuntu-shutdown-dialog`:
+- `--native`: Öffnet direkt den offiziellen KDE Plasma 6 Abmeldedialog.
+- `--daemon`: Startet den D-Bus-Hintergrunddienst ohne offenes Fenster.
+- `--no-dbus`: Öffnet den Dialog ohne D-Bus-Registrierung.
+- `-h`, `--help`: Zeigt die Hilfe an.
+- `-V`, `--version`: Zeigt die Versionsnummer an.
 
 ---
 
-## ⚙️ Automatisierter Linux-Build (GitHub Actions)
+## Automatisierter Linux-Build (GitHub Actions)
 
-Über [`.github/workflows/build.yml`](.github/workflows/build.yml) wird bei jedem Push und Pull Request auf `main`/`master` sowie bei Tags `v*`:
-- `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings` und `cargo test` ausgeführt,
-- das optimierte Linux-Release-Binary (`kubuntu-shutdown-dialog`) gebaut,
-- bei Pushes/Workflow-Läufen auf `main`/`master` das kompilierte Binary (`./kubuntu-shutdown-dialog`) automatisch mit `[skip ci]` zurück in den Branch committet und gepusht,
-- ein vollständiges Installationsarchiv (`kubuntu-altf4-shutdown-linux-x86_64.tar.gz`) samt SHA256-Prüfsumme als Artefakt hochgeladen (und bei `v*`-Tags an ein GitHub Release angehängt).
+Über [`.github/workflows/build.yml`](.github/workflows/build.yml) werden bei Pushes und Pull Requests auf `main`/`master` sowie bei `v*`-Tags folgende Schritte mit minimalen Berechtigungen (`contents: read`) und auf Commit-SHAs gepinnten Actions ausgeführt:
+- `cargo fmt --all -- --check`, `cargo clippy --all-targets --locked -- -D warnings` und `cargo test --locked`,
+- Sicherheitsprüfung der Abhängigkeiten in `Cargo.lock` über `cargo audit`,
+- Kompilierung des Release-Binaries (`cargo build --release --locked`) und Erstellung des Distributionsarchivs (`kubuntu-altf4-shutdown-linux-x86_64.tar.gz`) samt `SHA256SUMS.txt`,
+- Veröffentlichung als GitHub Release in einem isolierten Release-Job ausschließlich bei `v*`-Tags.
 
 ---
 
-## 🗑️ Deinstallation
+## Deinstallation
 
 ```bash
 ./uninstall.sh
 ```
-Dadurch wird die originale `Alt+F4` Verknüpfung von KWin wiederhergestellt und alle installierten Dateien werden sauber entfernt.
+
+Stellt die Standard-`Alt + F4`-Tastenkombination von KWin wieder her und entfernt die installierten Benutzerdateien.
+
+---
+
+## Lizenz und Drittanbieter-Ressourcen
+
+Dieses Projekt ist unter der **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)** lizenziert.
+
+Die in `src/icons.rs` als Fallback eingebetteten SVG-Grafiken stammen aus dem **KDE Breeze Icon Theme** (`breeze-icons`, KDE Community) und stehen unter der **GNU Lesser General Public License v3.0 or later (`LGPL-3.0-or-later`)**, die mit `GPL-3.0-or-later` kompatibel ist.
